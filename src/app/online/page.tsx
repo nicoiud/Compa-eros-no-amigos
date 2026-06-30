@@ -19,65 +19,76 @@ export default function OnlineLobby() {
   async function createRoom() {
     if (!name.trim()) { setError('Ingresá tu nombre'); return }
     setLoading(true)
-    const supabase = createClient()
-    const playerId = crypto.randomUUID()
-    const roomCode = generateCode()
+    setError('')
+    try {
+      const supabase = createClient()
+      const roomCode = generateCode()
 
-    const { data: room, error: roomErr } = await supabase
-      .from('rooms')
-      .insert({ code: roomCode, mode: 'online', status: 'lobby' })
-      .select()
-      .single()
+      const { data: room, error: roomErr } = await supabase
+        .from('rooms')
+        .insert({ code: roomCode, mode: 'online', status: 'lobby' })
+        .select()
+        .single()
 
-    if (roomErr) { setError(roomErr.message); setLoading(false); return }
+      if (roomErr) throw roomErr
 
-    await supabase.from('players').insert({
-      room_id: room.id,
-      name: name.trim(),
-      is_host: true,
-      player_id: playerId,
-    })
+      const { data: player, error: playerErr } = await supabase
+        .from('players')
+        .insert({ room_id: room.id, name: name.trim(), is_host: true })
+        .select()
+        .single()
 
-    localStorage.setItem(`player_id_${roomCode}`, playerId)
-    router.push(`/online/${roomCode}`)
+      if (playerErr) throw playerErr
+
+      localStorage.setItem(`player_id_${roomCode}`, player.id)
+      router.push(`/online/${roomCode}`)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Error al crear sala')
+      setLoading(false)
+    }
   }
 
   async function joinRoom() {
     if (!name.trim()) { setError('Ingresá tu nombre'); return }
     if (!code.trim()) { setError('Ingresá el código de sala'); return }
     setLoading(true)
-    const supabase = createClient()
-    const upperCode = code.trim().toUpperCase()
+    setError('')
+    try {
+      const supabase = createClient()
+      const upperCode = code.trim().toUpperCase()
 
-    const { data: room, error: roomErr } = await supabase
-      .from('rooms')
-      .select('*')
-      .eq('code', upperCode)
-      .single()
+      const { data: room, error: roomErr } = await supabase
+        .from('rooms')
+        .select('*')
+        .eq('code', upperCode)
+        .single()
 
-    if (roomErr || !room) { setError('Sala no encontrada'); setLoading(false); return }
-    if (room.status === 'finished') { setError('Esta partida ya terminó'); setLoading(false); return }
+      if (roomErr || !room) throw new Error('Sala no encontrada')
+      if (room.status === 'finished') throw new Error('Esta partida ya terminó')
 
-    // Verificar nombre duplicado
-    const { data: existing } = await supabase
-      .from('players')
-      .select('id')
-      .eq('room_id', room.id)
-      .eq('name', name.trim())
-      .maybeSingle()
+      const { data: existing } = await supabase
+        .from('players')
+        .select('id')
+        .eq('room_id', room.id)
+        .eq('name', name.trim())
+        .maybeSingle()
 
-    if (existing) { setError('Ese nombre ya está en uso en esta sala'); setLoading(false); return }
+      if (existing) throw new Error('Ese nombre ya está en uso en esta sala')
 
-    const playerId = crypto.randomUUID()
-    await supabase.from('players').insert({
-      room_id: room.id,
-      name: name.trim(),
-      is_host: false,
-      player_id: playerId,
-    })
+      const { data: player, error: playerErr } = await supabase
+        .from('players')
+        .insert({ room_id: room.id, name: name.trim(), is_host: false })
+        .select()
+        .single()
 
-    localStorage.setItem(`player_id_${upperCode}`, playerId)
-    router.push(`/online/${upperCode}`)
+      if (playerErr) throw playerErr
+
+      localStorage.setItem(`player_id_${upperCode}`, player.id)
+      router.push(`/online/${upperCode}`)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Error al unirse')
+      setLoading(false)
+    }
   }
 
   return (
@@ -119,11 +130,7 @@ export default function OnlineLobby() {
 
           {error && <p className="text-red-400 text-sm">{error}</p>}
 
-          <button
-            onClick={mode === 'create' ? createRoom : joinRoom}
-            disabled={loading}
-            className="btn-primary"
-          >
+          <button onClick={mode === 'create' ? createRoom : joinRoom} disabled={loading} className="btn-primary">
             {loading ? 'Conectando...' : mode === 'create' ? 'Crear sala' : 'Entrar'}
           </button>
           <button onClick={() => { setMode('menu'); setError('') }} className="text-[#888] text-sm">← Volver</button>

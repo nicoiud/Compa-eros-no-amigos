@@ -1,14 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Room, Category, TieAction } from '@/types/game'
-
-interface Player {
-  id: string
-  name: string
-  is_host: boolean
-  player_id: string
-}
+import { Room, OnlinePlayer, Category, TieAction } from '@/types/game'
 
 interface Props {
   room: Room
@@ -16,25 +9,32 @@ interface Props {
 }
 
 export default function OnlineLobbyRoom({ room, playerId }: Props) {
-  const [players, setPlayers] = useState<Player[]>([])
+  const [players, setPlayers] = useState<OnlinePlayer[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [enabledCatIds, setEnabledCatIds] = useState<string[]>([])
   const [cardsToWin, setCardsToWin] = useState(5)
   const [tieAction, setTieAction] = useState<TieAction>('discard')
   const [starting, setStarting] = useState(false)
 
-  const me = players.find(p => p.player_id === playerId)
+  const me = players.find(p => p.id === playerId)
   const isHost = me?.is_host ?? false
 
   useEffect(() => {
     const supabase = createClient()
 
-    supabase.from('players').select('*').eq('room_id', room.id).then(({ data }) => setPlayers(data ?? []))
+    function loadPlayers() {
+      supabase.from('players').select('*').eq('room_id', room.id).then(({ data }) =>
+        setPlayers((data ?? []) as unknown as OnlinePlayer[])
+      )
+    }
+
+    loadPlayers()
     supabase.from('categories').select('*').order('sort_order').then(({ data }) => setCategories(data ?? []))
 
     const channel = supabase.channel(`lobby:${room.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'players', filter: `room_id=eq.${room.id}` }, () => {
-        supabase.from('players').select('*').eq('room_id', room.id).then(({ data }) => setPlayers(data ?? []))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'players', filter: `room_id=eq.${room.id}` }, loadPlayers)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rooms', filter: `id=eq.${room.id}` }, payload => {
+        if (payload.new.status === 'in_progress') window.location.reload()
       })
       .subscribe()
 
@@ -50,8 +50,9 @@ export default function OnlineLobbyRoom({ room, playerId }: Props) {
     setStarting(true)
     const supabase = createClient()
     const { data: cards } = await supabase.from('cards').select('*').eq('active', true).eq('moderation_status', 'approved')
-    const onlinePlayers = players.map((p, i) => ({
-      player_id: p.player_id,
+
+    const onlinePlayers: OnlinePlayer[] = players.map((p, i) => ({
+      id: p.id,
       name: p.name,
       is_host: p.is_host,
       cards_won: 0,
@@ -79,7 +80,7 @@ export default function OnlineLobbyRoom({ room, playerId }: Props) {
         <h2 className="text-xs font-bold uppercase tracking-widest text-[#888]">Jugadores ({players.length})</h2>
         {players.map(p => (
           <div key={p.id} className="flex items-center gap-2 py-1">
-            <span className="w-2 h-2 rounded-full bg-green-400"></span>
+            <span className="w-2 h-2 rounded-full bg-green-400 inline-block"></span>
             <span className="font-semibold">{p.name}</span>
             {p.is_host && <span className="text-xs text-[#888] ml-auto">host</span>}
           </div>

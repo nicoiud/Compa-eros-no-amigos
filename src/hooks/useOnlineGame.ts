@@ -1,14 +1,10 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { OnlineGameState, OnlinePlayer, Card, Category, TieAction } from '@/types/game'
 import {
-  onlineStartGame,
-  onlineRevealCard,
-  onlineStartVoting,
-  onlineCastVote,
-  onlineResolveRound,
-  onlineNextTurn,
+  onlineStartGame, onlineRevealCard, onlineStartVoting,
+  onlineCastVote, onlineResolveRound, onlineNextTurn,
 } from '@/lib/game/engine'
 
 interface UseOnlineGameProps {
@@ -18,14 +14,13 @@ interface UseOnlineGameProps {
   isHost: boolean
 }
 
-export function useOnlineGame({ roomId, playerId, isHost }: UseOnlineGameProps) {
+export function useOnlineGame({ roomId, playerId }: UseOnlineGameProps) {
   const [game, setGame] = useState<OnlineGameState | null>(null)
   const [lobbyPlayers, setLobbyPlayers] = useState<OnlinePlayer[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [allCards, setAllCards] = useState<Card[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Carga inicial de cartas y categorías
   useEffect(() => {
     async function load() {
       const supabase = createClient()
@@ -40,21 +35,16 @@ export function useOnlineGame({ roomId, playerId, isHost }: UseOnlineGameProps) 
     load()
   }, [])
 
-  // Suscripción Realtime
   useEffect(() => {
     const supabase = createClient()
 
     const channel = supabase
       .channel(`room:${roomId}`)
-      // Jugadores en lobby
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'players', filter: `room_id=eq.${roomId}` }, payload => {
-        if (payload.eventType === 'INSERT') {
-          setLobbyPlayers(prev => [...prev, payload.new as OnlinePlayer])
-        } else if (payload.eventType === 'DELETE') {
-          setLobbyPlayers(prev => prev.filter(p => p.player_id !== (payload.old as OnlinePlayer).player_id))
-        }
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'players', filter: `room_id=eq.${roomId}` }, () => {
+        supabase.from('players').select('*').eq('room_id', roomId).then(({ data }) => {
+          setLobbyPlayers((data ?? []) as unknown as OnlinePlayer[])
+        })
       })
-      // Estado del juego
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'game_state', filter: `room_id=eq.${roomId}` }, payload => {
         setGame(payload.new.state as OnlineGameState)
       })
@@ -63,12 +53,9 @@ export function useOnlineGame({ roomId, playerId, isHost }: UseOnlineGameProps) 
       })
       .subscribe()
 
-    // Cargar jugadores existentes en lobby
     supabase.from('players').select('*').eq('room_id', roomId).then(({ data }) => {
       setLobbyPlayers((data ?? []) as unknown as OnlinePlayer[])
     })
-
-    // Cargar game_state si ya existe
     supabase.from('game_state').select('state').eq('room_id', roomId).maybeSingle().then(({ data }) => {
       if (data) setGame(data.state as OnlineGameState)
     })
@@ -76,7 +63,6 @@ export function useOnlineGame({ roomId, playerId, isHost }: UseOnlineGameProps) 
     return () => { supabase.removeChannel(channel) }
   }, [roomId])
 
-  // Solo el host puede mutar el estado
   async function pushState(newState: OnlineGameState) {
     const supabase = createClient()
     await supabase.from('game_state').upsert({ room_id: roomId, state: newState })
@@ -84,37 +70,34 @@ export function useOnlineGame({ roomId, playerId, isHost }: UseOnlineGameProps) 
   }
 
   async function hostStartGame(enabledCategoryIds: string[], cardsToWin: number, tieAction: TieAction) {
-    if (!isHost) return
     const newState = onlineStartGame(lobbyPlayers, allCards, enabledCategoryIds, cardsToWin, tieAction)
     await pushState(newState)
-    // Actualizar status de la sala
     const supabase = createClient()
     await supabase.from('rooms').update({ status: 'in_progress' }).eq('id', roomId)
   }
 
   async function hostRevealCard() {
-    if (!isHost || !game) return
+    if (!game) return
     await pushState(onlineRevealCard(game))
   }
 
   async function hostStartVoting() {
-    if (!isHost || !game) return
+    if (!game) return
     await pushState(onlineStartVoting(game))
   }
 
   async function castVote(votedForId: string) {
     if (!game) return
-    const newState = onlineCastVote(game, playerId, votedForId)
-    await pushState(newState)
+    await pushState(onlineCastVote(game, playerId, votedForId))
   }
 
   async function hostResolveRound() {
-    if (!isHost || !game) return
+    if (!game) return
     await pushState(onlineResolveRound(game))
   }
 
   async function hostNextTurn() {
-    if (!isHost || !game) return
+    if (!game) return
     const newState = onlineNextTurn(game)
     await pushState(newState)
     if (newState.phase === 'finished') {
@@ -123,29 +106,17 @@ export function useOnlineGame({ roomId, playerId, isHost }: UseOnlineGameProps) 
     }
   }
 
-  const mePlayer = game?.players.find(p => p.player_id === playerId) ?? null
+  const mePlayer = game?.players.find(p => p.id === playerId) ?? lobbyPlayers.find(p => p.id === playerId) ?? null
   const currentTurnPlayer = game ? game.players[game.currentTurnIndex] : null
-  const isMyTurn = currentTurnPlayer?.player_id === playerId
+  const isMyTurn = currentTurnPlayer?.id === playerId
   const alreadyVoted = game ? game.votes[playerId] !== undefined : false
   const allVotesCast = game
-    ? game.players.every(p => p.player_id === currentTurnPlayer?.player_id || game.votes[p.player_id] !== undefined)
+    ? game.players.every(p => p.id === currentTurnPlayer?.id || game.votes[p.id] !== undefined)
     : false
 
   return {
-    game,
-    lobbyPlayers,
-    categories,
-    loading,
-    mePlayer,
-    currentTurnPlayer,
-    isMyTurn,
-    alreadyVoted,
-    allVotesCast,
-    hostStartGame,
-    hostRevealCard,
-    hostStartVoting,
-    castVote,
-    hostResolveRound,
-    hostNextTurn,
+    game, lobbyPlayers, categories, loading,
+    mePlayer, currentTurnPlayer, isMyTurn, alreadyVoted, allVotesCast,
+    hostStartGame, hostRevealCard, hostStartVoting, castVote, hostResolveRound, hostNextTurn,
   }
 }

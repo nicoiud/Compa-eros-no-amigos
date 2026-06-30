@@ -24,7 +24,7 @@ export interface Card {
   created_at: string
 }
 
-// ─── LOCAL MODE (1 dispositivo) ────────────────────────────────────────────
+// ─── LOCAL MODE ──────────────────────────────────────────────
 
 export interface LocalPlayer {
   name: string
@@ -34,8 +34,8 @@ export interface LocalPlayer {
 
 export interface RoundResult {
   card: Card
-  votes: Record<string, string> // voterName → votedForName
-  tally: Record<string, number> // playerName → voteCount
+  votes: Record<string, string>
+  tally: Record<string, number>
   winner: LocalPlayer | null
   isTie: boolean
 }
@@ -51,14 +51,14 @@ export interface LocalGameState {
   round: number
   cardsToWin: number
   tieAction: TieAction
-  votes: Record<string, string> // voterName → votedForName
+  votes: Record<string, string>
   roundResult: RoundResult | null
 }
 
-// ─── ONLINE MODE ────────────────────────────────────────────────────────────
+// ─── ONLINE MODE ─────────────────────────────────────────────
 
 export interface OnlinePlayer {
-  player_id: string // UUID del dispositivo
+  id: string        // maps to players.id in DB
   name: string
   is_host: boolean
   cards_won: number
@@ -70,20 +70,20 @@ export interface OnlineGameState {
   phase: GamePhase
   players: OnlinePlayer[]
   enabledCategoryIds: string[]
-  cards: Card[] // mazo mezclado
+  cards: Card[]
   usedCardIds: string[]
   currentCard: Card | null
   currentTurnIndex: number
   round: number
   cardsToWin: number
   tieAction: TieAction
-  votes: Record<string, string> // player_id → player_id
+  votes: Record<string, string>   // player id → player id
   roundResult: OnlineRoundResult | null
 }
 
 export interface OnlineRoundResult {
   card: Card
-  tally: Record<string, number> // player_id → voteCount
+  tally: Record<string, number>   // player id → voteCount
   winnerId: string | null
   isTie: boolean
 }

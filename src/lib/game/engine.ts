@@ -1,7 +1,5 @@
 import { LocalGameState, LocalPlayer, OnlineGameState, OnlinePlayer, Card, TieAction } from '@/types/game'
 
-// ─── UTILS ──────────────────────────────────────────────────────────────────
-
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr]
   for (let i = a.length - 1; i > 0; i--) {
@@ -25,7 +23,7 @@ function countVotes(votes: Record<string, string>): Record<string, number> {
   return tally
 }
 
-// ─── LOCAL ENGINE ────────────────────────────────────────────────────────────
+// ─── LOCAL ENGINE ─────────────────────────────────────────────
 
 export function localStartGame(
   playerNames: string[],
@@ -35,14 +33,8 @@ export function localStartGame(
   tieAction: TieAction
 ): LocalGameState {
   const shuffledNames = shuffle(playerNames)
-  const players: LocalPlayer[] = shuffledNames.map((name, i) => ({
-    name,
-    cardsWon: 0,
-    turnOrder: i,
-  }))
-
+  const players: LocalPlayer[] = shuffledNames.map((name, i) => ({ name, cardsWon: 0, turnOrder: i }))
   const filteredCards = cards.filter(c => enabledCategoryIds.includes(c.category_id))
-
   return {
     phase: 'card_reveal',
     players,
@@ -68,11 +60,7 @@ export function localStartVoting(state: LocalGameState): LocalGameState {
   return { ...state, phase: 'voting' }
 }
 
-export function localCastVote(
-  state: LocalGameState,
-  voterName: string,
-  votedForName: string
-): LocalGameState {
+export function localCastVote(state: LocalGameState, voterName: string, votedForName: string): LocalGameState {
   return { ...state, votes: { ...state.votes, [voterName]: votedForName } }
 }
 
@@ -88,11 +76,8 @@ export function localResolveRound(state: LocalGameState): LocalGameState {
   let usedCardIds = state.usedCardIds
 
   if (winner && state.currentCard) {
-    updatedPlayers = state.players.map(p =>
-      p.name === winner.name ? { ...p, cardsWon: p.cardsWon + 1 } : p
-    )
+    updatedPlayers = state.players.map(p => p.name === winner.name ? { ...p, cardsWon: p.cardsWon + 1 } : p)
   }
-
   if (state.currentCard && (!isTie || state.tieAction === 'discard')) {
     usedCardIds = [...state.usedCardIds, state.currentCard.id]
   }
@@ -114,16 +99,9 @@ export function localResolveRound(state: LocalGameState): LocalGameState {
 
 export function localNextTurn(state: LocalGameState): LocalGameState {
   const winner = state.players.find(p => p.cardsWon >= state.cardsToWin)
-  if (winner) {
-    return { ...state, phase: 'finished' }
-  }
-
+  if (winner) return { ...state, phase: 'finished' }
   const nextTurnIndex = (state.currentTurnIndex + 1) % state.players.length
-
-  // Si el mazo se agotó, reiniciarlo
   const available = state.cards.filter(c => !state.usedCardIds.includes(c.id))
-  const usedCardIds = available.length === 0 ? [] : state.usedCardIds
-
   return {
     ...state,
     currentTurnIndex: nextTurnIndex,
@@ -131,12 +109,12 @@ export function localNextTurn(state: LocalGameState): LocalGameState {
     currentCard: null,
     votes: {},
     roundResult: null,
-    usedCardIds,
+    usedCardIds: available.length === 0 ? [] : state.usedCardIds,
     phase: 'card_reveal',
   }
 }
 
-// ─── ONLINE ENGINE ───────────────────────────────────────────────────────────
+// ─── ONLINE ENGINE ────────────────────────────────────────────
 
 export function onlineStartGame(
   players: OnlinePlayer[],
@@ -147,7 +125,6 @@ export function onlineStartGame(
 ): OnlineGameState {
   const shuffledPlayers = shuffle(players).map((p, i) => ({ ...p, turn_order: i }))
   const filteredCards = cards.filter(c => enabledCategoryIds.includes(c.category_id))
-
   return {
     phase: 'card_reveal',
     players: shuffledPlayers,
@@ -173,11 +150,7 @@ export function onlineStartVoting(state: OnlineGameState): OnlineGameState {
   return { ...state, phase: 'voting' }
 }
 
-export function onlineCastVote(
-  state: OnlineGameState,
-  voterId: string,
-  votedForId: string
-): OnlineGameState {
+export function onlineCastVote(state: OnlineGameState, voterId: string, votedForId: string): OnlineGameState {
   return { ...state, votes: { ...state.votes, [voterId]: votedForId } }
 }
 
@@ -192,11 +165,8 @@ export function onlineResolveRound(state: OnlineGameState): OnlineGameState {
   let usedCardIds = state.usedCardIds
 
   if (winnerId) {
-    updatedPlayers = state.players.map(p =>
-      p.player_id === winnerId ? { ...p, cards_won: p.cards_won + 1 } : p
-    )
+    updatedPlayers = state.players.map(p => p.id === winnerId ? { ...p, cards_won: p.cards_won + 1 } : p)
   }
-
   if (state.currentCard && (!isTie || state.tieAction === 'discard')) {
     usedCardIds = [...state.usedCardIds, state.currentCard.id]
   }
@@ -213,11 +183,8 @@ export function onlineResolveRound(state: OnlineGameState): OnlineGameState {
 export function onlineNextTurn(state: OnlineGameState): OnlineGameState {
   const winner = state.players.find(p => p.cards_won >= state.cardsToWin)
   if (winner) return { ...state, phase: 'finished' }
-
   const nextTurnIndex = (state.currentTurnIndex + 1) % state.players.length
   const available = state.cards.filter(c => !state.usedCardIds.includes(c.id))
-  const usedCardIds = available.length === 0 ? [] : state.usedCardIds
-
   return {
     ...state,
     currentTurnIndex: nextTurnIndex,
@@ -225,7 +192,7 @@ export function onlineNextTurn(state: OnlineGameState): OnlineGameState {
     currentCard: null,
     votes: {},
     roundResult: null,
-    usedCardIds,
+    usedCardIds: available.length === 0 ? [] : state.usedCardIds,
     phase: 'card_reveal',
   }
 }
