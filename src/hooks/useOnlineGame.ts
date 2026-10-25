@@ -88,7 +88,21 @@ export function useOnlineGame({ roomId, playerId }: UseOnlineGameProps) {
 
   async function castVote(votedForId: string) {
     if (!game) return
-    await pushState(onlineCastVote(game, playerId, votedForId))
+    // Se vota vía RPC (merge atómico en la DB): si cada jugador subiera el estado
+    // entero, dos votos simultáneos se pisarían y la ronda quedaría trabada.
+    const supabase = createClient()
+    const { error } = await supabase.rpc('cast_vote', {
+      p_room_id: roomId,
+      p_voter_id: playerId,
+      p_voted_for_id: votedForId,
+    })
+    if (error) {
+      // Sin la migración 0002 la función no existe: votamos como antes
+      console.warn('cast_vote RPC falló, se usa upsert del estado:', error.message)
+      await pushState(onlineCastVote(game, playerId, votedForId))
+      return
+    }
+    setGame(g => (g ? onlineCastVote(g, playerId, votedForId) : g))
   }
 
   async function hostResolveRound() {
