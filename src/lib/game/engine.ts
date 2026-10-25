@@ -15,6 +15,14 @@ function pickCard(cards: Card[], usedCardIds: string[]): Card | null {
   return available[Math.floor(Math.random() * available.length)]
 }
 
+// Las cartas pueden nombrar a alguien de la ronda con {jugador}: se elige al sacar la
+// carta y queda en currentCard, así en online todos ven el mismo nombre.
+function personalize(card: Card | null, playerNames: string[]): Card | null {
+  if (!card || !card.text.includes('{jugador}') || playerNames.length === 0) return card
+  const name = playerNames[Math.floor(Math.random() * playerNames.length)]
+  return { ...card, text: card.text.split('{jugador}').join(name) }
+}
+
 function countVotes(votes: Record<string, string>): Record<string, number> {
   const tally: Record<string, number> = {}
   for (const votedFor of Object.values(votes)) {
@@ -52,7 +60,7 @@ export function localStartGame(
 }
 
 export function localRevealCard(state: LocalGameState): LocalGameState {
-  const card = pickCard(state.cards, state.usedCardIds)
+  const card = personalize(pickCard(state.cards, state.usedCardIds), state.players.map(p => p.name))
   return { ...state, currentCard: card, phase: 'card_reveal', votes: {}, roundResult: null }
 }
 
@@ -142,7 +150,7 @@ export function onlineStartGame(
 }
 
 export function onlineRevealCard(state: OnlineGameState): OnlineGameState {
-  const card = pickCard(state.cards, state.usedCardIds)
+  const card = personalize(pickCard(state.cards, state.usedCardIds), state.players.map(p => p.name))
   return { ...state, currentCard: card, phase: 'card_reveal', votes: {}, roundResult: null }
 }
 

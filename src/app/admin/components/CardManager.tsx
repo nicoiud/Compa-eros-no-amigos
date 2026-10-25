@@ -83,7 +83,10 @@ export default function CardManager({ cards, categories, onReload }: Props) {
           value={form.text}
           onChange={e => setForm(f => ({ ...f, text: e.target.value }))}
         />
-        <div className="text-right text-xs text-[#555]">{form.text.length}/200</div>
+        <div className="flex justify-between gap-3">
+          <p className="text-xs text-[#555]">Tip: escribí {'{jugador}'} y el juego pone el nombre de alguien de la ronda.</p>
+          <span className="text-xs text-[#555] shrink-0">{form.text.length}/200</span>
+        </div>
         <select
           className="bg-[#242424] rounded-xl px-4 py-3 outline-none"
           value={form.category_id}

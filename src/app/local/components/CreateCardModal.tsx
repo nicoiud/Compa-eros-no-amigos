@@ -65,7 +65,10 @@ export default function CreateCardModal({ categories, onClose, onCreated }: Prop
               onChange={e => { setText(e.target.value); setError('') }}
               autoFocus
             />
-            <div className="text-right text-xs text-[#555]">{text.length}/200</div>
+            <div className="flex justify-between gap-3">
+              <p className="text-xs text-[#555]">Tip: escribí {'{jugador}'} y el juego pone el nombre de alguien de la ronda.</p>
+              <span className="text-xs text-[#555] shrink-0">{text.length}/200</span>
+            </div>
 
             <select
               className="bg-[#242424] rounded-xl px-4 py-3 outline-none"
