@@ -1,19 +1,20 @@
 'use client'
-import { use, useEffect, useState } from 'react'
-import { useOnlineGame } from '@/hooks/useOnlineGame'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Room } from '@/types/game'
 import OnlineLobbyRoom from '../components/OnlineLobbyRoom'
 import OnlineGame from '../components/OnlineGame'
 
+// En Next.js 14 `params` es un objeto plano (recién en Next 15 pasa a ser una Promise)
 interface Props {
-  params: Promise<{ code: string }>
+  params: { code: string }
 }
 
 export default function OnlineRoomPage({ params }: Props) {
-  const { code } = use(params)
+  const { code } = params
   const [room, setRoom] = useState<Room | null>(null)
-  const [playerId, setPlayerId] = useState<string | null>(null)
+  // undefined = todavía no leímos localStorage; null = este dispositivo no está en la sala
+  const [playerId, setPlayerId] = useState<string | null | undefined>(undefined)
   const [notFound, setNotFound] = useState(false)
 
   useEffect(() => {
@@ -31,6 +32,14 @@ export default function OnlineRoomPage({ params }: Props) {
     <div className="min-h-screen flex flex-col items-center justify-center gap-4 text-center p-6">
       <p className="text-2xl font-bold">Sala no encontrada</p>
       <a href="/online" className="btn-primary px-6 py-3">Volver</a>
+    </div>
+  )
+
+  if (playerId === null) return (
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4 text-center p-6">
+      <p className="text-2xl font-bold">No estás en la sala {code}</p>
+      <p className="text-[#888]">Entrá desde &quot;Unirse a sala&quot; con este código.</p>
+      <a href="/online" className="btn-primary px-6 py-3">Unirme</a>
     </div>
   )
 
