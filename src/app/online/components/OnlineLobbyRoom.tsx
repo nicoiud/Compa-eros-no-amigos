@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Room, OnlinePlayer, Category, TieAction } from '@/types/game'
+import { categoryStyle } from '@/lib/game/categoryStyles'
 
 interface Props {
   room: Room
@@ -11,6 +12,7 @@ interface Props {
 export default function OnlineLobbyRoom({ room, playerId }: Props) {
   const [players, setPlayers] = useState<OnlinePlayer[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [cardCounts, setCardCounts] = useState<Record<string, number>>({})
   const [enabledCatIds, setEnabledCatIds] = useState<string[]>([])
   const [cardsToWin, setCardsToWin] = useState(5)
   const [tieAction, setTieAction] = useState<TieAction>('discard')
@@ -30,6 +32,11 @@ export default function OnlineLobbyRoom({ room, playerId }: Props) {
 
     loadPlayers()
     supabase.from('categories').select('*').order('sort_order').then(({ data }) => setCategories(data ?? []))
+    supabase.from('cards').select('category_id').eq('active', true).eq('moderation_status', 'approved').then(({ data }) => {
+      const counts: Record<string, number> = {}
+      for (const c of data ?? []) counts[c.category_id] = (counts[c.category_id] ?? 0) + 1
+      setCardCounts(counts)
+    })
 
     const channel = supabase.channel(`lobby:${room.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'players', filter: `room_id=eq.${room.id}` }, loadPlayers)
@@ -45,8 +52,10 @@ export default function OnlineLobbyRoom({ room, playerId }: Props) {
     setEnabledCatIds(prev => prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id])
   }
 
+  const deckSize = enabledCatIds.reduce((sum, id) => sum + (cardCounts[id] ?? 0), 0)
+
   async function startGame() {
-    if (players.length < 3 || enabledCatIds.length === 0) return
+    if (players.length < 3 || deckSize === 0) return
     setStarting(true)
     const supabase = createClient()
     const { data: cards } = await supabase.from('cards').select('*').eq('active', true).eq('moderation_status', 'approved')
@@ -93,16 +102,22 @@ export default function OnlineLobbyRoom({ room, playerId }: Props) {
           <div className="card-surface p-4 flex flex-col gap-3">
             <h2 className="font-bold">Categorías</h2>
             <div className="flex flex-wrap gap-2">
-              {categories.map(cat => (
-                <button
-                  key={cat.id}
-                  onClick={() => toggleCat(cat.id)}
-                  className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-colors ${enabledCatIds.includes(cat.id) ? 'bg-[#c8ff00] text-black border-[#c8ff00]' : 'border-white/20 text-white'}`}
-                >
-                  {cat.is_adult ? '🔞 ' : ''}{cat.name}
-                </button>
-              ))}
+              {categories.map(cat => {
+                const count = cardCounts[cat.id] ?? 0
+                return (
+                  <button
+                    key={cat.id}
+                    onClick={() => toggleCat(cat.id)}
+                    disabled={count === 0}
+                    className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${enabledCatIds.includes(cat.id) ? 'bg-[#c8ff00] text-black border-[#c8ff00]' : 'border-white/20 text-white'}`}
+                  >
+                    {cat.is_adult ? '🔞' : categoryStyle(cat.slug).emoji} {cat.name}
+                    <span className="ml-1.5 opacity-50 font-normal">{count}</span>
+                  </button>
+                )
+              })}
             </div>
+            {enabledCatIds.length > 0 && <p className="text-[#888] text-sm">{deckSize} cartas en el mazo</p>}
           </div>
 
           <div className="card-surface p-4 flex flex-col gap-3">
@@ -126,7 +141,7 @@ export default function OnlineLobbyRoom({ room, playerId }: Props) {
 
           <button
             onClick={startGame}
-            disabled={players.length < 3 || enabledCatIds.length === 0 || starting}
+            disabled={players.length < 3 || deckSize === 0 || starting}
             className="btn-primary text-lg py-4"
           >
             {starting ? 'Iniciando...' : 'Iniciar partida'}

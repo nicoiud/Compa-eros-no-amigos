@@ -29,4 +29,53 @@ body {
   .card-surface {
     @apply bg-[#1a1a1a] rounded-2xl border border-white/10;
   }
+
+  /* ── Cartas del juego ─────────────────────────────────── */
+  .flip-card {
+    perspective: 1200px;
+  }
+  .flip-card-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    transition: transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .flip-card-inner.is-flipped {
+    transform: rotateY(180deg);
+  }
+  .flip-card-face {
+    position: absolute;
+    inset: 0;
+    border-radius: 1.5rem;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    box-shadow: 0 20px 50px -15px rgba(0, 0, 0, 0.8);
+  }
+  .card-dorso {
+    color: var(--text);
+    border: 2px solid rgba(200, 255, 0, 0.35);
+    background:
+      radial-gradient(circle at 50% 45%, rgba(200, 255, 0, 0.12), transparent 60%),
+      repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.04) 0 10px, transparent 10px 20px),
+      #161616;
+  }
+  /* La franja de color va como gradiente para que la recorte el border-radius */
+  .card-frente {
+    transform: rotateY(180deg);
+    background:
+      linear-gradient(var(--cat) 0 12px, transparent 12px),
+      linear-gradient(160deg, #ffffff, #f1f0ea);
+  }
+  .mini-card {
+    background:
+      linear-gradient(90deg, var(--cat) 0 8px, transparent 8px),
+      linear-gradient(160deg, #ffffff, #f1f0ea);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flip-card-inner {
+    transition: none;
+  }
 }

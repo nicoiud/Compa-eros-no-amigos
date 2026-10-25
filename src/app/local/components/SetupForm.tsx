@@ -1,13 +1,15 @@
 'use client'
 import { useState } from 'react'
 import { Category, TieAction } from '@/types/game'
+import { categoryStyle } from '@/lib/game/categoryStyles'
 
 interface Props {
   categories: Category[]
+  cardCounts: Record<string, number>
   onStart: (playerNames: string[], categoryIds: string[], cardsToWin: number, tieAction: TieAction) => void
 }
 
-export default function SetupForm({ categories, onStart }: Props) {
+export default function SetupForm({ categories, cardCounts, onStart }: Props) {
   const [names, setNames] = useState<string[]>(['', '', ''])
   const [categoryIds, setCategoryIds] = useState<string[]>([])
   const [cardsToWin, setCardsToWin] = useState(5)
@@ -16,7 +18,8 @@ export default function SetupForm({ categories, onStart }: Props) {
   const validNames = names.map(n => n.trim()).filter(Boolean)
   const uniqueNames = new Set(validNames)
   const hasDuplicates = uniqueNames.size !== validNames.length
-  const canStart = validNames.length >= 3 && categoryIds.length > 0 && !hasDuplicates
+  const deckSize = categoryIds.reduce((sum, id) => sum + (cardCounts[id] ?? 0), 0)
+  const canStart = validNames.length >= 3 && deckSize > 0 && !hasDuplicates
 
   function addPlayer() { setNames(n => [...n, '']) }
   function removePlayer(i: number) { setNames(n => n.filter((_, idx) => idx !== i)) }
@@ -65,21 +68,28 @@ export default function SetupForm({ categories, onStart }: Props) {
       <section className="card-surface p-5 flex flex-col gap-3">
         <h2 className="font-bold text-lg">Categorías</h2>
         <div className="flex flex-wrap gap-2">
-          {categories.map(cat => (
-            <button
-              key={cat.id}
-              onClick={() => toggleCategory(cat.id)}
-              className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-colors ${
-                categoryIds.includes(cat.id)
-                  ? 'bg-[#c8ff00] text-black border-[#c8ff00]'
-                  : 'bg-transparent text-white border-white/20 hover:border-white/50'
-              }`}
-            >
-              {cat.is_adult ? '🔞 ' : ''}{cat.name}
-            </button>
-          ))}
+          {categories.map(cat => {
+            const count = cardCounts[cat.id] ?? 0
+            return (
+              <button
+                key={cat.id}
+                onClick={() => toggleCategory(cat.id)}
+                disabled={count === 0}
+                className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${
+                  categoryIds.includes(cat.id)
+                    ? 'bg-[#c8ff00] text-black border-[#c8ff00]'
+                    : 'bg-transparent text-white border-white/20 hover:border-white/50'
+                }`}
+              >
+                {cat.is_adult ? '🔞' : categoryStyle(cat.slug).emoji} {cat.name}
+                <span className="ml-1.5 opacity-50 font-normal">{count}</span>
+              </button>
+            )
+          })}
         </div>
-        {categoryIds.length === 0 && <p className="text-[#888] text-sm">Elegí al menos una categoría</p>}
+        {categoryIds.length === 0
+          ? <p className="text-[#888] text-sm">Elegí al menos una categoría</p>
+          : <p className="text-[#888] text-sm">{deckSize} cartas en el mazo</p>}
       </section>
 
       {/* Config */}

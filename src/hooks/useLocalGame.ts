@@ -79,6 +79,9 @@ export function useLocalGame() {
     setGame(INITIAL_STATE)
   }
 
+  const cardCounts: Record<string, number> = {}
+  for (const c of allCards) cardCounts[c.category_id] = (cardCounts[c.category_id] ?? 0) + 1
+
   const currentPlayer = game.players[game.currentTurnIndex] ?? null
   const allVotesCast =
     game.players.length > 0 &&
@@ -87,6 +90,7 @@ export function useLocalGame() {
   return {
     game,
     categories,
+    cardCounts,
     loading,
     currentPlayer,
     allVotesCast,

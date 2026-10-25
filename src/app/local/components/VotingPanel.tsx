@@ -1,7 +1,10 @@
 'use client'
-import { LocalPlayer } from '@/types/game'
+import { LocalPlayer, Card, Category } from '@/types/game'
+import { MiniCard } from '@/components/GameCard'
 
 interface Props {
+  card: Card | null
+  category?: Category
   players: LocalPlayer[]
   currentPlayer: LocalPlayer | null
   votes: Record<string, string>
@@ -10,7 +13,7 @@ interface Props {
   allVotesCast: boolean
 }
 
-export default function VotingPanel({ players, currentPlayer, votes, onCastVote, onResolve, allVotesCast }: Props) {
+export default function VotingPanel({ card, category, players, currentPlayer, votes, onCastVote, onResolve, allVotesCast }: Props) {
   // Jugadores que tienen que votar (todos menos el que tiene el turno)
   const voters = players.filter(p => p.name !== currentPlayer?.name)
 
@@ -20,6 +23,8 @@ export default function VotingPanel({ players, currentPlayer, votes, onCastVote,
         <h2 className="text-2xl font-black mb-1">¡A votar!</h2>
         <p className="text-[#888] text-sm">Marcá el voto de cada jugador</p>
       </div>
+
+      {card && <MiniCard card={card} category={category} />}
 
       <div className="text-center text-sm text-[#888]">
         {Object.keys(votes).length} de {voters.length} votos registrados

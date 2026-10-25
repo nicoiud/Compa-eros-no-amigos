@@ -10,6 +10,7 @@ export default function LocalPage() {
   const {
     game,
     categories,
+    cardCounts,
     loading,
     currentPlayer,
     allVotesCast,
@@ -21,6 +22,8 @@ export default function LocalPage() {
     nextTurn,
     resetGame,
   } = useLocalGame()
+
+  const categoryOf = (categoryId?: string) => categories.find(c => c.id === categoryId)
 
   if (loading) {
     return (
@@ -34,6 +37,7 @@ export default function LocalPage() {
     return (
       <SetupForm
         categories={categories}
+        cardCounts={cardCounts}
         onStart={(names, catIds, cardsToWin, tieAction) =>
           startGame(names, catIds, cardsToWin, tieAction)
         }
@@ -45,6 +49,7 @@ export default function LocalPage() {
     return (
       <CardReveal
         card={game.currentCard}
+        category={categoryOf(game.currentCard?.category_id)}
         currentPlayer={currentPlayer}
         round={game.round}
         onRevealCard={revealCard}
@@ -56,6 +61,8 @@ export default function LocalPage() {
   if (game.phase === 'voting') {
     return (
       <VotingPanel
+        card={game.currentCard}
+        category={categoryOf(game.currentCard?.category_id)}
         players={game.players}
         currentPlayer={currentPlayer}
         votes={game.votes}

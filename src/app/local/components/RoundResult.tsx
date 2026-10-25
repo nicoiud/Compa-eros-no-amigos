@@ -4,6 +4,7 @@ import { RoundResult as RoundResultType, LocalPlayer } from '@/types/game'
 import { Category } from '@/types/game'
 import CreateCardModal from './CreateCardModal'
 import Scoreboard from './Scoreboard'
+import { MiniCard } from '@/components/GameCard'
 
 interface Props {
   result: RoundResultType
@@ -19,10 +20,11 @@ export default function RoundResult({ result, players, cardsToWin, onNextTurn, c
   return (
     <div className="min-h-screen flex flex-col p-6 gap-5 max-w-lg mx-auto">
       {/* Carta */}
-      <div className="card-surface p-4 text-center">
-        <p className="text-[#888] text-xs uppercase tracking-widest mb-2">La pregunta fue</p>
-        <p className="font-semibold">{result.card.text}</p>
-      </div>
+      <MiniCard
+        card={result.card}
+        category={categories.find(c => c.id === result.card.category_id)}
+        label="La pregunta fue"
+      />
 
       {/* Resultado */}
       <div className="card-surface p-6 text-center">

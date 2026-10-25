@@ -2,6 +2,7 @@
 import { useOnlineGame } from '@/hooks/useOnlineGame'
 import { Room } from '@/types/game'
 import CreateCardModal from '@/app/local/components/CreateCardModal'
+import GameCard, { MiniCard } from '@/components/GameCard'
 import { useState } from 'react'
 
 interface Props {
@@ -13,7 +14,7 @@ export default function OnlineGame({ room, playerId }: Props) {
   const [showModal, setShowModal] = useState(false)
   const {
     game, categories, loading,
-    mePlayer, currentTurnPlayer, alreadyVoted, allVotesCast,
+    mePlayer, currentTurnPlayer, isMyTurn, alreadyVoted, allVotesCast,
     hostRevealCard, hostStartVoting, castVote, hostResolveRound, hostNextTurn,
   } = useOnlineGame({ roomId: room.id, roomCode: room.code, playerId, isHost: false })
 
@@ -22,33 +23,36 @@ export default function OnlineGame({ room, playerId }: Props) {
   )
 
   const isHost = mePlayer?.is_host ?? false
+  // Saca la carta y arranca la votación quien tiene el turno (o el host, por si se colgó)
+  const canDrive = isHost || isMyTurn
   const sorted = [...game.players].sort((a, b) => b.cards_won - a.cards_won)
+  const categoryOf = (categoryId?: string) => categories.find(c => c.id === categoryId)
 
   // ── CARD REVEAL ────────────────────────────────────────────
   if (game.phase === 'card_reveal') {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6 gap-6 max-w-lg mx-auto">
         <div className="text-center">
-          <p className="text-[#888] text-sm">Ronda {game.round} · Le toca a</p>
-          <p className="text-2xl font-black text-[#c8ff00]">{currentTurnPlayer?.name}</p>
+          <p className="text-[#888] text-sm uppercase tracking-widest mb-1">Ronda {game.round} · Le toca a</p>
+          <p className="text-2xl font-black text-[#c8ff00]">{isMyTurn ? 'Vos' : currentTurnPlayer?.name}</p>
         </div>
 
-        {game.currentCard ? (
-          <div className="card-surface p-8 w-full flex flex-col items-center gap-6">
-            <p className="text-2xl font-bold text-center leading-snug">{game.currentCard.text}</p>
-            {isHost && (
-              <button onClick={hostStartVoting} className="btn-primary w-full">¡A votar!</button>
-            )}
-            {!isHost && <p className="text-[#888] text-sm">Esperando que el host inicie la votación...</p>}
-          </div>
-        ) : (
-          <div className="card-surface p-8 w-full text-center">
-            {isHost
-              ? <button onClick={hostRevealCard} className="btn-primary text-lg px-10">Sacar carta</button>
-              : <p className="text-[#888]">Esperando que {currentTurnPlayer?.name} saque la carta...</p>
-            }
-          </div>
-        )}
+        <GameCard
+          card={game.currentCard}
+          category={categoryOf(game.currentCard?.category_id)}
+          onDraw={canDrive ? hostRevealCard : undefined}
+          drawLabel={canDrive ? 'Tocá para sacar carta' : `Esperando que ${currentTurnPlayer?.name} saque la carta...`}
+        />
+
+        <div className="w-full max-w-[300px] min-h-14 flex items-center justify-center">
+          {game.currentCard ? (
+            canDrive
+              ? <button onClick={hostStartVoting} className="btn-primary text-lg w-full">¡Listo, a votar!</button>
+              : <p className="text-[#888] text-sm text-center">Esperando que arranque la votación...</p>
+          ) : (
+            canDrive && <button onClick={hostRevealCard} className="btn-secondary text-lg w-full">Sacar carta</button>
+          )}
+        </div>
       </div>
     )
   }
@@ -66,9 +70,7 @@ export default function OnlineGame({ room, playerId }: Props) {
         </div>
 
         {game.currentCard && (
-          <div className="card-surface p-4 text-center">
-            <p className="font-semibold">{game.currentCard.text}</p>
-          </div>
+          <MiniCard card={game.currentCard} category={categoryOf(game.currentCard.category_id)} />
         )}
 
         {mePlayer?.id === currentTurnPlayer?.id ? (
@@ -117,10 +119,11 @@ export default function OnlineGame({ room, playerId }: Props) {
 
     return (
       <div className="min-h-screen flex flex-col p-6 gap-5 max-w-lg mx-auto">
-        <div className="card-surface p-4 text-center">
-          <p className="text-xs text-[#888] uppercase tracking-widest mb-2">La pregunta fue</p>
-          <p className="font-semibold">{roundResult.card.text}</p>
-        </div>
+        <MiniCard
+          card={roundResult.card}
+          category={categoryOf(roundResult.card.category_id)}
+          label="La pregunta fue"
+        />
 
         <div className="card-surface p-6 text-center">
           {roundResult.isTie ? (
