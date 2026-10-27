@@ -2,6 +2,8 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Category, Card } from '@/types/game'
+import CardFields, { CardDraft, EMPTY_DRAFT, draftColumns, draftError } from '@/components/CardFields'
+import { cardType, typeForCategory, TYPE_LABELS } from '@/lib/game/cardTypes'
 
 interface Props {
   cards: Card[]
@@ -10,7 +12,8 @@ interface Props {
 }
 
 export default function CardManager({ cards, categories, onReload }: Props) {
-  const [form, setForm] = useState({ text: '', category_id: '', visibility: 'official' as Card['visibility'] })
+  const [form, setForm] = useState({ category_id: '', visibility: 'official' as Card['visibility'] })
+  const [draft, setDraft] = useState<CardDraft>(EMPTY_DRAFT)
   const [editId, setEditId] = useState<string | null>(null)
   const [filterCat, setFilterCat] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
@@ -20,24 +23,27 @@ export default function CardManager({ cards, categories, onReload }: Props) {
 
   function startEdit(card: Card) {
     setEditId(card.id)
-    setForm({ text: card.text, category_id: card.category_id, visibility: card.visibility })
+    setForm({ category_id: card.category_id, visibility: card.visibility })
+    setDraft({ type: cardType(card), text: card.text, option_a: card.option_a ?? '', option_b: card.option_b ?? '' })
     setError('')
   }
 
   function cancel() {
     setEditId(null)
-    setForm({ text: '', category_id: '', visibility: 'official' })
+    setForm({ category_id: '', visibility: 'official' })
+    setDraft(EMPTY_DRAFT)
     setError('')
   }
 
   async function save() {
-    if (!form.text.trim() || !form.category_id) {
-      setError('Texto y categoría son obligatorios')
+    const problem = form.category_id ? draftError(draft) : 'Elegí una categoría'
+    if (problem) {
+      setError(problem)
       return
     }
     setSaving(true)
     const supabase = createClient()
-    const payload = { text: form.text.trim(), category_id: form.category_id, visibility: form.visibility, moderation_status: 'approved' as const, active: true }
+    const payload = { ...draftColumns(draft), category_id: form.category_id, visibility: form.visibility, moderation_status: 'approved' as const, active: true }
     const { error: err } = editId
       ? await supabase.from('cards').update(payload).eq('id', editId)
       : await supabase.from('cards').insert(payload)
@@ -64,7 +70,8 @@ export default function CardManager({ cards, categories, onReload }: Props) {
   const filtered = cards.filter(c => {
     if (filterCat && c.category_id !== filterCat) return false
     if (filterStatus && c.moderation_status !== filterStatus) return false
-    if (search && !c.text.toLowerCase().includes(search.toLowerCase())) return false
+    const haystack = [c.text, c.option_a, c.option_b].join(' ').toLowerCase()
+    if (search && !haystack.includes(search.toLowerCase())) return false
     return true
   })
 
@@ -75,28 +82,22 @@ export default function CardManager({ cards, categories, onReload }: Props) {
       {/* Formulario */}
       <div className="card-surface p-5 flex flex-col gap-3">
         <h2 className="font-bold">{editId ? 'Editar pregunta' : 'Nueva pregunta'}</h2>
-        <textarea
-          className="bg-[#242424] rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#c8ff00]/50 resize-none"
-          placeholder="¿Quién sería el primero en...?"
-          rows={3}
-          maxLength={200}
-          value={form.text}
-          onChange={e => setForm(f => ({ ...f, text: e.target.value }))}
-        />
-        <div className="flex justify-between gap-3">
-          <p className="text-xs text-[#555]">Tip: escribí {'{jugador}'} y el juego pone el nombre de alguien de la ronda.</p>
-          <span className="text-xs text-[#555] shrink-0">{form.text.length}/200</span>
-        </div>
         <select
           className="bg-[#242424] rounded-xl px-4 py-3 outline-none"
           value={form.category_id}
-          onChange={e => setForm(f => ({ ...f, category_id: e.target.value }))}
+          onChange={e => {
+            const categoryId = e.target.value
+            setForm(f => ({ ...f, category_id: categoryId }))
+            // Al crear, el tipo sigue a la categoría; al editar se respeta el de la carta
+            if (!editId) setDraft(d => ({ ...d, type: typeForCategory(catMap[categoryId]?.slug) }))
+          }}
         >
           <option value="">— Elegir categoría —</option>
           {categories.map(cat => (
             <option key={cat.id} value={cat.id}>{cat.name}</option>
           ))}
         </select>
+        <CardFields draft={draft} onChange={setDraft} />
         <select
           className="bg-[#242424] rounded-xl px-4 py-3 outline-none"
           value={form.visibility}
@@ -150,8 +151,14 @@ export default function CardManager({ cards, categories, onReload }: Props) {
           return (
             <div key={card.id} className={`card-surface p-4 flex flex-col gap-2 ${!card.active ? 'opacity-50' : ''}`}>
               <p className="font-medium leading-snug">{card.text}</p>
+              {cardType(card) === 'preferis' && (
+                <p className="text-sm text-[#888] leading-snug">A: {card.option_a} · B: {card.option_b}</p>
+              )}
               <div className="flex flex-wrap items-center gap-2 text-xs">
                 <span className="bg-[#242424] px-2 py-1 rounded-lg text-[#888]">{cat?.name ?? '—'}</span>
+                {cardType(card) !== 'quien' && (
+                  <span className="bg-[#242424] px-2 py-1 rounded-lg text-[#888]">{TYPE_LABELS[cardType(card)]}</span>
+                )}
                 <span className={`px-2 py-1 rounded-lg font-semibold ${
                   card.moderation_status === 'approved' ? 'bg-green-900/40 text-green-400' :
                   card.moderation_status === 'pending'  ? 'bg-yellow-900/40 text-yellow-400' :

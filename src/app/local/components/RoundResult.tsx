@@ -5,6 +5,8 @@ import { Category } from '@/types/game'
 import CreateCardModal from './CreateCardModal'
 import Scoreboard from './Scoreboard'
 import { MiniCard } from '@/components/GameCard'
+import { RoundHeadline, ChoiceBreakdown } from '@/components/RoundSummary'
+import { cardType } from '@/lib/game/cardTypes'
 
 interface Props {
   result: RoundResultType
@@ -27,47 +29,32 @@ export default function RoundResult({ result, players, cardsToWin, onNextTurn, c
       />
 
       {/* Resultado */}
-      <div className="card-surface p-6 text-center">
-        {result.isTie ? (
-          <>
-            <div className="text-4xl mb-2">🤝</div>
-            <h2 className="text-2xl font-black">¡Empate!</h2>
-            <p className="text-[#888] mt-1">La carta no se asigna</p>
-          </>
-        ) : result.winner ? (
-          <>
-            <div className="text-4xl mb-2">🏆</div>
-            <p className="text-[#888] text-sm mb-1">Ganó la carta</p>
-            <h2 className="text-3xl font-black text-[#c8ff00]">{result.winner.name}</h2>
-          </>
-        ) : (
-          <>
-            <div className="text-4xl mb-2">🃏</div>
-            <h2 className="text-2xl font-black">Sin votos</h2>
-          </>
-        )}
-      </div>
+      <RoundHeadline card={result.card} winnerNames={result.winners} isTie={result.isTie} />
 
       {/* Votos */}
-      <div className="card-surface p-4 flex flex-col gap-2">
-        <h3 className="text-xs font-bold uppercase tracking-widest text-[#888]">Votos</h3>
-        {Object.entries(result.tally)
-          .sort(([, a], [, b]) => b - a)
-          .map(([name, count]) => (
-            <div key={name} className="flex items-center gap-3">
-              <span className="flex-1 font-semibold">{name}</span>
-              <div className="flex gap-1">
-                {Array.from({ length: count }).map((_, i) => (
-                  <span key={i} className="text-[#c8ff00]">●</span>
-                ))}
+      {cardType(result.card) !== 'quien' ? (
+        <ChoiceBreakdown card={result.card} votes={result.votes} nameOf={name => name} />
+      ) : (
+        <div className="card-surface p-4 flex flex-col gap-2">
+          <h3 className="text-xs font-bold uppercase tracking-widest text-[#888]">Votos</h3>
+          {Object.entries(result.tally)
+            .sort(([, a], [, b]) => b - a)
+            .map(([name, count]) => (
+              <div key={name} className="flex items-center gap-3">
+                <span className="flex-1 font-semibold">{name}</span>
+                <div className="flex gap-1">
+                  {Array.from({ length: count }).map((_, i) => (
+                    <span key={i} className="text-[#c8ff00]">●</span>
+                  ))}
+                </div>
+                <span className="text-[#888] text-sm w-4 text-right">{count}</span>
               </div>
-              <span className="text-[#888] text-sm w-4 text-right">{count}</span>
-            </div>
-          ))}
-      </div>
+            ))}
+        </div>
+      )}
 
       {/* Scoreboard */}
-      <Scoreboard players={players} cardsToWin={cardsToWin} highlightName={result.winner?.name} />
+      <Scoreboard players={players} cardsToWin={cardsToWin} highlightNames={result.winners} />
 
       {/* Acciones */}
       <div className="flex flex-col gap-3 pb-6">

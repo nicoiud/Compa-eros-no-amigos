@@ -6,6 +6,7 @@ import {
   onlineStartGame, onlineRevealCard, onlineStartVoting,
   onlineCastVote, onlineResolveRound, onlineNextTurn,
 } from '@/lib/game/engine'
+import { turnPlayerVotes } from '@/lib/game/cardTypes'
 
 interface UseOnlineGameProps {
   roomId: string
@@ -124,8 +125,9 @@ export function useOnlineGame({ roomId, playerId }: UseOnlineGameProps) {
   const currentTurnPlayer = game ? game.players[game.currentTurnIndex] : null
   const isMyTurn = currentTurnPlayer?.id === playerId
   const alreadyVoted = game ? game.votes[playerId] !== undefined : false
+  const everyoneVotes = turnPlayerVotes(game?.currentCard)
   const allVotesCast = game
-    ? game.players.every(p => p.id === currentTurnPlayer?.id || game.votes[p.id] !== undefined)
+    ? game.players.every(p => (!everyoneVotes && p.id === currentTurnPlayer?.id) || game.votes[p.id] !== undefined)
     : false
 
   return {

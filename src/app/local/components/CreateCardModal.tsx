@@ -2,6 +2,8 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Category } from '@/types/game'
+import CardFields, { CardDraft, EMPTY_DRAFT, draftColumns, draftError } from '@/components/CardFields'
+import { typeForCategory } from '@/lib/game/cardTypes'
 
 interface Props {
   categories: Category[]
@@ -10,22 +12,23 @@ interface Props {
 }
 
 export default function CreateCardModal({ categories, onClose, onCreated }: Props) {
-  const [text, setText] = useState('')
   const [categoryId, setCategoryId] = useState(categories[0]?.id ?? '')
+  const [draft, setDraft] = useState<CardDraft>({ ...EMPTY_DRAFT, type: typeForCategory(categories[0]?.slug) })
   const [visibility, setVisibility] = useState<'private' | 'public'>('private')
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
 
   async function submit() {
-    if (!text.trim() || !categoryId) {
-      setError('Completá el texto y la categoría')
+    const problem = categoryId ? draftError(draft) : 'Elegí una categoría'
+    if (problem) {
+      setError(problem)
       return
     }
     setSaving(true)
     const supabase = createClient()
     const { error: err } = await supabase.from('cards').insert({
-      text: text.trim(),
+      ...draftColumns(draft),
       category_id: categoryId,
       visibility,
       moderation_status: visibility === 'public' ? 'pending' : 'approved',
@@ -56,29 +59,21 @@ export default function CreateCardModal({ categories, onClose, onCreated }: Prop
               <button onClick={onClose} className="text-[#888] hover:text-white text-xl">✕</button>
             </div>
 
-            <textarea
-              className="bg-[#242424] rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-[#c8ff00]/50 resize-none text-base"
-              placeholder="¿Quién sería el primero en...?"
-              rows={3}
-              maxLength={200}
-              value={text}
-              onChange={e => { setText(e.target.value); setError('') }}
-              autoFocus
-            />
-            <div className="flex justify-between gap-3">
-              <p className="text-xs text-[#555]">Tip: escribí {'{jugador}'} y el juego pone el nombre de alguien de la ronda.</p>
-              <span className="text-xs text-[#555] shrink-0">{text.length}/200</span>
-            </div>
-
             <select
               className="bg-[#242424] rounded-xl px-4 py-3 outline-none"
               value={categoryId}
-              onChange={e => setCategoryId(e.target.value)}
+              onChange={e => {
+                const slug = categories.find(c => c.id === e.target.value)?.slug
+                setCategoryId(e.target.value)
+                setDraft(d => ({ ...d, type: typeForCategory(slug) }))
+              }}
             >
               {categories.map(cat => (
                 <option key={cat.id} value={cat.id}>{cat.name}</option>
               ))}
             </select>
+
+            <CardFields draft={draft} onChange={d => { setDraft(d); setError('') }} autoFocus />
 
             <div className="flex flex-col gap-2">
               <p className="text-sm text-[#888]">¿Querés que otros la usen?</p>

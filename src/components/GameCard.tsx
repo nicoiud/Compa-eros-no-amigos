@@ -2,6 +2,7 @@
 import { CSSProperties } from 'react'
 import { Card, Category } from '@/types/game'
 import { categoryStyle } from '@/lib/game/categoryStyles'
+import { cardType, PREFERIS_DEFAULT_TEXT } from '@/lib/game/cardTypes'
 
 interface Props {
   card: Card | null
@@ -11,10 +12,42 @@ interface Props {
   drawLabel?: string
 }
 
-function textSize(text: string) {
-  if (text.length > 140) return 'text-lg'
-  if (text.length > 90) return 'text-xl'
+function textSize(length: number) {
+  if (length > 140) return 'text-lg'
+  if (length > 90) return 'text-xl'
   return 'text-2xl'
+}
+
+// Texto de la carta según su tipo. En "¿Qué preferís?" el texto es la consigna
+// (solo se muestra si no es la de siempre) y abajo van las dos opciones.
+function CardContent({ card, big }: { card: Card; big?: boolean }) {
+  if (cardType(card) === 'preferis') {
+    const options = [card.option_a ?? '', card.option_b ?? '']
+    const size = big ? textSize(options.join('').length + 50) : ''
+    return (
+      <div className="flex flex-col gap-2">
+        {card.text !== PREFERIS_DEFAULT_TEXT && (
+          <p className={`${big ? 'text-sm' : 'text-xs'} font-bold uppercase tracking-wider text-black/45`}>{card.text}</p>
+        )}
+        {options.map((option, i) => (
+          <div key={i} className="flex flex-col gap-2">
+            {i === 1 && <span className="text-xs font-black uppercase tracking-widest text-black/35">o</span>}
+            <div className="flex items-start gap-2">
+              <span className="mt-0.5 shrink-0 w-6 h-6 rounded-full bg-[color:var(--cat)] text-black text-xs font-black flex items-center justify-center">
+                {i === 0 ? 'A' : 'B'}
+              </span>
+              <p className={`${size} font-black leading-snug text-[#111]`}>{option}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+  return (
+    <p className={`${big ? `${textSize(card.text.length)} font-black` : 'font-bold'} leading-snug text-[#111]`}>
+      {card.text}
+    </p>
+  )
 }
 
 export default function GameCard({ card, category, onDraw, drawLabel = 'Tocá para sacar carta' }: Props) {
@@ -52,9 +85,7 @@ export default function GameCard({ card, category, onDraw, drawLabel = 'Tocá pa
             </span>
           </div>
           <div className="flex-1 flex items-center">
-            <p className={`${textSize(card?.text ?? '')} font-black leading-snug text-[#111]`}>
-              {card?.text}
-            </p>
+            {card && <CardContent card={card} big />}
           </div>
           <div className="flex items-center justify-between text-xs font-bold text-black/40">
             <span>Compañeros</span>
@@ -80,7 +111,7 @@ export function MiniCard({ card, category, label }: { card: Card; category?: Cat
         </span>
         {label && <span className="text-[11px] uppercase tracking-widest text-black/40 font-bold">{label}</span>}
       </div>
-      <p className="font-bold leading-snug text-[#111]">{card.text}</p>
+      <CardContent card={card} />
     </div>
   )
 }

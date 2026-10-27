@@ -3,6 +3,8 @@ import { useOnlineGame } from '@/hooks/useOnlineGame'
 import { Room } from '@/types/game'
 import CreateCardModal from '@/app/local/components/CreateCardModal'
 import GameCard, { MiniCard } from '@/components/GameCard'
+import { RoundHeadline, ChoiceBreakdown } from '@/components/RoundSummary'
+import { cardType, choicesFor, turnPlayerVotes } from '@/lib/game/cardTypes'
 import { useState } from 'react'
 
 interface Props {
@@ -59,21 +61,25 @@ export default function OnlineGame({ room, playerId }: Props) {
 
   // ── VOTING ─────────────────────────────────────────────────
   if (game.phase === 'voting') {
-    const voters = game.players.filter(p => p.id !== currentTurnPlayer?.id)
+    const type = cardType(game.currentCard)
+    // En "¿Quién...?" no vota el del turno; en "¿Qué preferís?" y "Yo nunca" contestan todos
+    const voters = turnPlayerVotes(game.currentCard) ? game.players : game.players.filter(p => p.id !== currentTurnPlayer?.id)
     const voteCount = Object.keys(game.votes).length
 
     return (
       <div className="min-h-screen flex flex-col p-6 gap-5 max-w-lg mx-auto">
         <div className="text-center">
-          <h2 className="text-2xl font-black mb-1">¡A votar!</h2>
-          <p className="text-[#888] text-sm">{voteCount} de {voters.length} votos</p>
+          <h2 className="text-2xl font-black mb-1">{type === 'quien' ? '¡A votar!' : type === 'preferis' ? '¿Qué preferís?' : '¿Lo hiciste?'}</h2>
+          <p className="text-[#888] text-sm">
+            {voteCount} de {voters.length} votos{type !== 'quien' && ' · la minoría se lleva la carta'}
+          </p>
         </div>
 
         {game.currentCard && (
           <MiniCard card={game.currentCard} category={categoryOf(game.currentCard.category_id)} />
         )}
 
-        {mePlayer?.id === currentTurnPlayer?.id ? (
+        {type === 'quien' && mePlayer?.id === currentTurnPlayer?.id ? (
           <div className="card-surface p-6 text-center text-[#888]">
             Vos preguntaste — esperá los votos del resto
           </div>
@@ -81,6 +87,19 @@ export default function OnlineGame({ room, playerId }: Props) {
           <div className="card-surface p-6 text-center">
             <p className="text-[#c8ff00] font-bold text-lg">¡Voto registrado!</p>
             <p className="text-[#888] text-sm mt-1">Esperando al resto... ({voteCount}/{voters.length})</p>
+          </div>
+        ) : type !== 'quien' && game.currentCard ? (
+          <div className={`flex gap-2 ${type === 'preferis' ? 'flex-col' : ''}`}>
+            {choicesFor(game.currentCard).map((choice, i) => (
+              <button
+                key={choice.value}
+                onClick={() => castVote(choice.value)}
+                className={`flex-1 px-4 py-4 rounded-xl font-semibold border border-white/20 hover:border-[#c8ff00] hover:text-[#c8ff00] transition-colors ${type === 'preferis' ? 'text-left' : ''}`}
+              >
+                {type === 'preferis' && <span className="font-black mr-2">{i === 0 ? 'A' : 'B'}</span>}
+                {choice.label}
+              </button>
+            ))}
           </div>
         ) : (
           <div className="card-surface p-4 flex flex-col gap-3">
@@ -114,7 +133,6 @@ export default function OnlineGame({ room, playerId }: Props) {
   // ── ROUND RESULT ───────────────────────────────────────────
   if (game.phase === 'round_result' && game.roundResult) {
     const { roundResult } = game
-    const winnerPlayer = roundResult.winnerId ? game.players.find(p => p.id === roundResult.winnerId) : null
     const playerMap = Object.fromEntries(game.players.map(p => [p.id, p.name]))
 
     return (
@@ -125,24 +143,26 @@ export default function OnlineGame({ room, playerId }: Props) {
           label="La pregunta fue"
         />
 
-        <div className="card-surface p-6 text-center">
-          {roundResult.isTie ? (
-            <><div className="text-4xl mb-2">🤝</div><h2 className="text-2xl font-black">¡Empate!</h2><p className="text-[#888]">La carta no se asigna</p></>
-          ) : winnerPlayer ? (
-            <><div className="text-4xl mb-2">🏆</div><p className="text-[#888] text-sm mb-1">Ganó la carta</p><h2 className="text-3xl font-black text-[#c8ff00]">{winnerPlayer.name}</h2></>
-          ) : null}
-        </div>
+        <RoundHeadline
+          card={roundResult.card}
+          winnerNames={(roundResult.winnerIds ?? []).map(id => playerMap[id] ?? id)}
+          isTie={roundResult.isTie}
+        />
 
-        <div className="card-surface p-4 flex flex-col gap-2">
-          <h3 className="text-xs font-bold uppercase tracking-widest text-[#888]">Votos</h3>
-          {Object.entries(roundResult.tally).sort(([,a],[,b]) => b-a).map(([id, count]) => (
-            <div key={id} className="flex items-center gap-2">
-              <span className="flex-1 font-semibold">{playerMap[id] ?? id}</span>
-              <span className="text-[#c8ff00]">{'●'.repeat(count)}</span>
-              <span className="text-[#888] text-sm">{count}</span>
-            </div>
-          ))}
-        </div>
+        {cardType(roundResult.card) !== 'quien' ? (
+          <ChoiceBreakdown card={roundResult.card} votes={game.votes} nameOf={id => playerMap[id] ?? id} />
+        ) : (
+          <div className="card-surface p-4 flex flex-col gap-2">
+            <h3 className="text-xs font-bold uppercase tracking-widest text-[#888]">Votos</h3>
+            {Object.entries(roundResult.tally).sort(([,a],[,b]) => b-a).map(([id, count]) => (
+              <div key={id} className="flex items-center gap-2">
+                <span className="flex-1 font-semibold">{playerMap[id] ?? id}</span>
+                <span className="text-[#c8ff00]">{'●'.repeat(count)}</span>
+                <span className="text-[#888] text-sm">{count}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="card-surface p-4 flex flex-col gap-2">
           <h3 className="text-xs font-bold uppercase tracking-widest text-[#888]">Puntaje</h3>

@@ -10,6 +10,7 @@ import {
   localResolveRound,
   localNextTurn,
 } from '@/lib/game/engine'
+import { turnPlayerVotes } from '@/lib/game/cardTypes'
 
 const INITIAL_STATE: LocalGameState = {
   phase: 'setup',
@@ -83,9 +84,10 @@ export function useLocalGame() {
   for (const c of allCards) cardCounts[c.category_id] = (cardCounts[c.category_id] ?? 0) + 1
 
   const currentPlayer = game.players[game.currentTurnIndex] ?? null
+  const everyoneVotes = turnPlayerVotes(game.currentCard)
   const allVotesCast =
     game.players.length > 0 &&
-    game.players.every(p => p.name === currentPlayer?.name || game.votes[p.name] !== undefined)
+    game.players.every(p => (!everyoneVotes && p.name === currentPlayer?.name) || game.votes[p.name] !== undefined)
 
   return {
     game,
